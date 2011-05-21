@@ -6,53 +6,62 @@
 
 	<fx:Script>
 		<![CDATA[
+			import com.adobe.serialization.json.JSONEncoder;
+			import com.trembit.protgame.model.GameModel;
 			import com.trembit.protgame.util.WebService;
 			
 			import mx.events.FlexEvent;
 			import mx.utils.ObjectUtil;
 			
 			import org.spicefactory.lib.task.SequentialTaskGroup;
-			import org.spicefactory.lib.task.TaskGroup;
+			import org.spicefactory.lib.task.Task;
+
+
+			[Bindable]
+			public var gameModel:GameModel=new GameModel();
 
 			protected function onCreationComplete(event:FlexEvent):void
 			{
-				var calls : Array = [
-					new WebService("http://127.0.0.1:5984/tiles",
-						URLRequestMethod.PUT,
-						function(data : Object) : void {
-							trace(ObjectUtil.toString(data));
-						}
-					),
-					new WebService("http://127.0.0.1:5984/tiles",
-						URLRequestMethod.GET,
-						function(data : Object) : void {
-							trace(ObjectUtil.toString(data));
-						}
-					),
-					new WebService("http://127.0.0.1:5984/tiles",
-						URLRequestMethod.GET,
-						function(data : Object) : void {
-							trace(ObjectUtil.toString(data));
-						}
-					)
-					
-				];
+				var taskList:Array = [];
+				
+				taskList.push(new WebService("tiles", URLRequestMethod.DELETE, null));
 
-				var task : SequentialTaskGroup = new SequentialTaskGroup();
-				for each (var webService : WebService in calls) {
-					task.addTask(webService);
+				taskList.push(new WebService("tiles", URLRequestMethod.PUT, ""));
+
+				taskList.push(new WebService("players", URLRequestMethod.DELETE, null));
+
+				taskList.push(new WebService("players", URLRequestMethod.PUT, ""));
+
+				const size : uint = 5;
+				var xCount : int = size;
+				var yCount : int = size;
+				var tiles : Array = [];
+				while (xCount >= 0) {
+					while (yCount >= 0) {
+						tiles.push({_id:String(xCount + ":" + yCount),x:xCount, y:yCount});
+						yCount--;
+					}
+					xCount--;
+					yCount = size;
+				}
+
+				var batchCreateBytes : ByteArray = new ByteArray();
+				batchCreateBytes.writeUTFBytes(new JSONEncoder({docs:tiles}).getString());
+				batchCreateBytes.position = 0;
+				taskList.push(new WebService("tiles/_bulk_docs", URLRequestMethod.POST, batchCreateBytes));
+				// END INIT
+				
+				//taskList.push(new WebService("players/_bulk_docs", URLRequestMethod.POST, batchCreateBytes));
+
+
+				var task:SequentialTaskGroup=new SequentialTaskGroup();
+				for each (var subTask:Task in taskList)
+				{
+					task.addTask(subTask);
 				}
 				task.start();
 			}
-
-			private function onTableComplete(event : Event) : void {
-				trace("Loaded", event);
-			}
 		]]>
 	</fx:Script>
-
-	<fx:Declarations>
-		<s:RemoteObject id="webService"/>
-	</fx:Declarations>
 
 </s:Application>

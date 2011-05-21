@@ -1,46 +1,61 @@
 package com.trembit.protgame.util
 {
+	import com.adobe.net.URI;
 	import com.adobe.serialization.json.JSONDecoder;
 	
-	import flash.events.Event;
-	import flash.net.URLLoader;
-	import flash.net.URLRequest;
+	import flash.net.URLRequestMethod;
 	
+	import org.httpclient.HttpClient;
+	import org.httpclient.events.HttpDataEvent;
 	import org.spicefactory.lib.task.Task;
 
 	public class WebService extends Task
 	{
-		private var loader : URLLoader = new URLLoader();
+
+		private var client:HttpClient;
 
 		private var handler : Function;
 		
 		private var url : String;
 		
 		private var method : String;
+		
+		private var body : *;
 
-		public function WebService(url : String, method : String, handler : Function)
+		public function WebService(url : String, method : String, body : *, handler : Function = null)
 		{
 			super();
 			this.url = url;
 			this.method = method;
 			this.handler = handler;
+			this.body = body;
 		}
 
 		override protected function doStart():void {
-			loader.addEventListener(Event.COMPLETE, onLoadComplete);
-			var req : URLRequest = new URLRequest(url);
-			req.method = method;
-			loader.load(req);
+			client = new HttpClient();
+			client.listener.onData = function(event:HttpDataEvent):void {
+				var stringData:String = event.readUTFBytes();
+				if (handler != null) {
+					handler(new JSONDecoder(stringData).getValue());
+				}
+				complete();
+			};
+
+			var uri:URI = new URI(Endpoint.COUCHDB + url);
+			if (method == URLRequestMethod.PUT) {
+				client.put(uri, body);
+			} else if (method == URLRequestMethod.GET) {
+				client.get(uri);
+			} else if (method == URLRequestMethod.DELETE) {
+				client.del(uri);
+			} else if (method == URLRequestMethod.POST) {
+				client.post(uri, body, "application/json");
+			}
+			trace(uri.toDisplayString());
 		}
 
-		private function onLoadComplete(event : Event) : void {
-			var d : JSONDecoder = new JSONDecoder(loader.data);
-			handler(d.getValue());
-			complete();
-		}
-		
 		override public function toString() : String {
-			return "Call " + url;
+			return method + " " + url;
 		}
 	}
 }
