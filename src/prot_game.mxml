@@ -29,6 +29,12 @@
 							trace(ObjectUtil.toString(data));
 						}
 					),
+					new WebService("http://127.0.0.1:5984/tiles",
+						URLRequestMethod.GET,
+						function(data : Object) : void {
+							trace(ObjectUtil.toString(data));
+						}
+					)
 					
 				];
 
