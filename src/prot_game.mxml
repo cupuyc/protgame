@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009"
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   minWidth="955" minHeight="600" creationComplete="onCreationComplete(event)">
+
+	<fx:Script>
+		<![CDATA[
+			import com.trembit.protgame.util.WebService;
+			
+			import mx.events.FlexEvent;
+			import mx.utils.ObjectUtil;
+			
+			import org.spicefactory.lib.task.SequentialTaskGroup;
+			import org.spicefactory.lib.task.TaskGroup;
+
+			protected function onCreationComplete(event:FlexEvent):void
+			{
+				var calls : Array = [
+					new WebService("http://127.0.0.1:5984/tiles",
+						URLRequestMethod.PUT,
+						function(data : Object) : void {
+							trace(ObjectUtil.toString(data));
+						}
+					),
+					new WebService("http://127.0.0.1:5984/tiles",
+						URLRequestMethod.GET,
+						function(data : Object) : void {
+							trace(ObjectUtil.toString(data));
+						}
+					),
+					
+				];
+
+				var task : SequentialTaskGroup = new SequentialTaskGroup();
+				for each (var webService : WebService in calls) {
+					task.addTask(webService);
+				}
+				task.start();
+			}
+
+			private function onTableComplete(event : Event) : void {
+				trace("Loaded", event);
+			}
+		]]>
+	</fx:Script>
+
+	<fx:Declarations>
+		<s:RemoteObject id="webService"/>
+	</fx:Declarations>
+
+</s:Application>
