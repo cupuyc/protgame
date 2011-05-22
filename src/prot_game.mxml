@@ -18,6 +18,8 @@
             import org.spicefactory.lib.task.SequentialTaskGroup;
             import org.spicefactory.lib.task.Task;
 
+            [Embed(source="scripts/playersbytile.txt", mimeType="application/octet-stream")]
+            private var playersbytileClass:Class;
 
             [Bindable]
             public var gameModel:GameModel=GameModel.instance;
@@ -25,9 +27,6 @@
             protected function onCreationComplete(event:FlexEvent):void
             {
 
-                var string : String = '{"total_rows":1,"offset":0,"rows":[{"id":"2","key":null,"value":{"_id":"2","_rev":"1-2189551590478bb8f9f03d5911073d24","name":"UIComponent","tileX":1,"tileY":1}}]}';
-                var obj : Object = new JSONDecoder(string, true).getValue();
-                
                 var taskList:Array = [];
 
                 taskList.push(new RestServiceTask("tiles", URLRequestMethod.DELETE, null));
@@ -79,17 +78,16 @@
                     getBodyForRequest(
                         {name:"CupuyC",tileX:0, tileY:0})));
 
+                var ba : ByteArray  = new playersbytileClass();
+                var mapFunString : String = ba.readUTFBytes(ba.length);
+
                 taskList.push(new RestServiceTask("players/_design/playersbytile", 
-                    URLRequestMethod.PUT, 
+                    URLRequestMethod.PUT,
                     getBodyForRequest(
                         {
                             language:"javascript",
                             views:{
-                                playersbytile:{map:"function(doc) {" +
-                                "    if (doc.tileX == 1 && doc.tileY == 1) {" +
-                                "        emit(null, doc);" +
-                                "    }" +
-                                "}"}
+                                playersbytile:{map:mapFunString}
                             }
                         })));
 
@@ -111,15 +109,5 @@
             }
         ]]>
     </fx:Script>
-    
-    <fx:Declarations>
-        <fx:String id="playersbytile"><![CDATA[
-function(doc) {
-    if (doc.tileX == 1 && doc.tileY == 1) {
-        emit(null, doc);
-    }
-}
-]]></fx:String>
-    </fx:Declarations>
-    
+
 </s:Application>

@@ -1,0 +1,5 @@
+function(doc) {
+    if (doc.tileX == 1 && doc.tileY == 1) {
+        emit(null, doc);
+    }
+}
