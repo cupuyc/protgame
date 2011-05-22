@@ -1,67 +1,125 @@
 <?xml version="1.0" encoding="utf-8"?>
 <s:Application xmlns:fx="http://ns.adobe.com/mxml/2009"
-			   xmlns:s="library://ns.adobe.com/flex/spark"
-			   xmlns:mx="library://ns.adobe.com/flex/mx"
-			   minWidth="955" minHeight="600" creationComplete="onCreationComplete(event)">
+               xmlns:s="library://ns.adobe.com/flex/spark"
+               xmlns:mx="library://ns.adobe.com/flex/mx"
+               minWidth="955" minHeight="600" creationComplete="onCreationComplete(event)">
 
-	<fx:Script>
-		<![CDATA[
-			import com.adobe.serialization.json.JSONEncoder;
-			import com.trembit.protgame.model.GameModel;
-			import com.trembit.protgame.util.WebService;
-			
-			import mx.events.FlexEvent;
-			import mx.utils.ObjectUtil;
-			
-			import org.spicefactory.lib.task.SequentialTaskGroup;
-			import org.spicefactory.lib.task.Task;
-
-
-			[Bindable]
-			public var gameModel:GameModel=new GameModel();
-
-			protected function onCreationComplete(event:FlexEvent):void
-			{
-				var taskList:Array = [];
-				
-				taskList.push(new WebService("tiles", URLRequestMethod.DELETE, null));
-
-				taskList.push(new WebService("tiles", URLRequestMethod.PUT, ""));
-
-				taskList.push(new WebService("players", URLRequestMethod.DELETE, null));
-
-				taskList.push(new WebService("players", URLRequestMethod.PUT, ""));
-
-				const size : uint = 5;
-				var xCount : int = size;
-				var yCount : int = size;
-				var tiles : Array = [];
-				while (xCount >= 0) {
-					while (yCount >= 0) {
-						tiles.push({_id:String(xCount + ":" + yCount),x:xCount, y:yCount});
-						yCount--;
-					}
-					xCount--;
-					yCount = size;
-				}
-
-				var batchCreateBytes : ByteArray = new ByteArray();
-				batchCreateBytes.writeUTFBytes(new JSONEncoder({docs:tiles}).getString());
-				batchCreateBytes.position = 0;
-				taskList.push(new WebService("tiles/_bulk_docs", URLRequestMethod.POST, batchCreateBytes));
-				// END INIT
-				
-				//taskList.push(new WebService("players/_bulk_docs", URLRequestMethod.POST, batchCreateBytes));
+    <fx:Script>
+        <![CDATA[
+            import com.adobe.serialization.json.JSONDecoder;
+            import com.adobe.serialization.json.JSONEncoder;
+            import com.trembit.protgame.model.GameModel;
+            import com.trembit.protgame.util.PollServerTask;
+            import com.trembit.protgame.util.RestServiceTask;
+            
+            import mx.events.FlexEvent;
+            import mx.utils.ObjectUtil;
+            
+            import org.spicefactory.lib.task.SequentialTaskGroup;
+            import org.spicefactory.lib.task.Task;
 
 
-				var task:SequentialTaskGroup=new SequentialTaskGroup();
-				for each (var subTask:Task in taskList)
-				{
-					task.addTask(subTask);
-				}
-				task.start();
-			}
-		]]>
-	</fx:Script>
+            [Bindable]
+            public var gameModel:GameModel=GameModel.instance;
 
+            protected function onCreationComplete(event:FlexEvent):void
+            {
+
+                var string : String = '{"total_rows":1,"offset":0,"rows":[{"id":"2","key":null,"value":{"_id":"2","_rev":"1-2189551590478bb8f9f03d5911073d24","name":"UIComponent","tileX":1,"tileY":1}}]}';
+                var obj : Object = new JSONDecoder(string, true).getValue();
+                
+                var taskList:Array = [];
+
+                taskList.push(new RestServiceTask("tiles", URLRequestMethod.DELETE, null));
+
+                taskList.push(new RestServiceTask("tiles", URLRequestMethod.PUT, ""));
+
+                taskList.push(new RestServiceTask("players", URLRequestMethod.DELETE, null));
+
+                taskList.push(new RestServiceTask("players", URLRequestMethod.PUT, ""));
+
+                const size : uint = 1;
+                var xCount : int = size;
+                var yCount : int = size;
+                var tiles : Array = [];
+                while (xCount >= 0) {
+                    while (yCount >= 0) {
+                        tiles.push({_id:String(xCount + ":" + yCount),x:xCount, y:yCount});
+                        yCount--;
+                    }
+                    xCount--;
+                    yCount = size;
+                }
+
+                taskList.push(new RestServiceTask("tiles/_bulk_docs", URLRequestMethod.POST, getBodyForRequest({docs:tiles})));
+                // END INIT
+
+                taskList.push(new RestServiceTask("players/1", 
+                    URLRequestMethod.PUT, 
+                    getBodyForRequest(
+                        {name:"CupuyC",tileX:0, tileY:0})));
+
+                taskList.push(new RestServiceTask("players/2", 
+                    URLRequestMethod.PUT, 
+                    getBodyForRequest(
+                        {name:"UIComponent",tileX:1, tileY:1})));
+                
+                taskList.push(new RestServiceTask("players/3", 
+                    URLRequestMethod.PUT, 
+                    getBodyForRequest(
+                        {name:"Asset",tileX:2, tileY:2})));
+
+                taskList.push(new RestServiceTask("players/4", 
+                    URLRequestMethod.PUT, 
+                    getBodyForRequest(
+                        {name:"CPUBrain",tileX:3, tileY:3})));
+
+                taskList.push(new RestServiceTask("players", 
+                    URLRequestMethod.PUT, 
+                    getBodyForRequest(
+                        {name:"CupuyC",tileX:0, tileY:0})));
+
+                taskList.push(new RestServiceTask("players/_design/playersbytile", 
+                    URLRequestMethod.PUT, 
+                    getBodyForRequest(
+                        {
+                            language:"javascript",
+                            views:{
+                                playersbytile:{map:"function(doc) {" +
+                                "    if (doc.tileX == 1 && doc.tileY == 1) {" +
+                                "        emit(null, doc);" +
+                                "    }" +
+                                "}"}
+                            }
+                        })));
+
+                taskList.push(new PollServerTask());
+
+                var task:SequentialTaskGroup=new SequentialTaskGroup();
+                for each (var subTask:Task in taskList)
+                {
+                    task.addTask(subTask);
+                }
+                task.start();
+            }
+
+            private function getBodyForRequest(object : Object) : ByteArray {
+                var ba : ByteArray = new ByteArray();
+                ba.writeUTFBytes(new JSONEncoder(object).getString());
+                ba.position = 0;
+                return ba;
+            }
+        ]]>
+    </fx:Script>
+    
+    <fx:Declarations>
+        <fx:String id="playersbytile"><![CDATA[
+function(doc) {
+    if (doc.tileX == 1 && doc.tileY == 1) {
+        emit(null, doc);
+    }
+}
+]]></fx:String>
+    </fx:Declarations>
+    
 </s:Application>
